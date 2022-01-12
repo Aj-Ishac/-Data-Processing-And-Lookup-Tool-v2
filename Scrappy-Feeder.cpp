@@ -8,9 +8,31 @@
 #include <iomanip>
 #include <ctime>
 #include <sstream>
+#include <map>
 
 using namespace std;
 using namespace std::chrono;
+
+void printMap(multimap<string, Records>);
+void printHistorySeq(vector<string>&);
+void printMainMenu(vector<Records>);
+void outputTable(vector<Records>);
+
+void SortByName(multimap<string, Records>&, vector<string>&, bool&, bool&);
+void SortByPrice(multimap<string, Records>&, vector<string>&, string);
+void SortByDate(multimap<string, Records>&, vector<string>&, string);
+
+void InsertElement(vector<Records>&, vector<string>&, string);
+void ModifyElement(vector<Records>&, vector<string>&);
+void RemoveElement(vector<Records>&, vector<string>&);
+
+void ImportFile(multimap<string, Records>&, vector<string>&);
+void MergeVectors(multimap<string, Records>&, multimap<string, Records>);
+
+bool isdigitCheck(string);
+bool isalphaCheck(string);
+string CurrentTimeStr();
+string FormatTime(system_clock::time_point);
 
 struct Records {
 
@@ -20,55 +42,29 @@ struct Records {
     string name;
 };
 
-void printVector(vector<Records>, string);
-void printHistorySeq(vector<string>&);
-void printMainMenu(vector<Records>);
-void outputTable(vector<Records>);
-
-void SortByName(vector<Records>&, vector<string>&, string, bool&, bool&);
-void SortByPrice(vector<Records>&, vector<string>&, string, string);
-void SortByDate(vector<Records>&, vector<string>&, string, string);
-
-void InsertElement(vector<Records>&, vector<string>&, string);
-void ModifyElement(vector<Records>&, vector<string>&);
-void RemoveElement(vector<Records>&, vector<string>&);
-
-void ImportFile(vector<Records>&, vector<string>&, string);
-void MergeVectors(vector<Records>&, vector<Records>, string);
-
-bool isdigitCheck(string);
-bool isalphaCheck(string);
-string CurrentTimeStr();
-string FormatTime(system_clock::time_point);
-
 int main()
-{
-    //split vector
-    //print seperately based on name
-    //in the case of multiple readings of the same name. (scraper)
-    //sort already implemented
-
-    //read from csv
+{    
     //print to csv
-    //import csv
-    //allow user to decide import file
     //split receipt and output it seperately
-    //if char length during print > than #, add ... to string at the end
+    //remove everything above x price after split receipt
     //dummy element needs clearing after func completes
-
-    //on import. filename dependent on trancating needs to be based on both names now
+    //look into changing historyseq from vector to array 
+    //put menu in with screenclr and implement funcs step by step with currents adapted for map vs vector
+    //stl sort not working with map vs vector
 
     //vector used for the base data
     vector<Records> record;
     vector<string> historySeq;
-    Records tempV;
+
+    //multimap to take string and struct
+    multimap<string, Records> record_map;
 
     bool isSorted = false;
     bool sortedName_A = false;
     bool sortedName_D = false;
     string Sort_Order;
-
     string filename = "3070.csv";
+    string filename_withoutformat = filename.substr(0, filename.size() - 4);
 
     //cout << endl << "Input Base File (filename.format): ";
     //cin >> filename;
@@ -84,11 +80,12 @@ int main()
         exit(1);
     }
 
-    //file -> struct input -> vector
+    //file -> map(string, struct)
+    Records tempV;
     string tempHeaderline;
     inFile.ignore(500,'\n');
     while (getline(inFile, tempV.date, ','))//!inFile.eof())
-    {      
+    {
         string tempPrice;
 
         getline(inFile, tempPrice, ',');
@@ -96,17 +93,16 @@ int main()
         getline(inFile, tempV.source, ',');
         getline(inFile, tempV.name);
 
-        record.push_back(tempV);
+        record_map.insert(pair<string, Records>(filename_withoutformat, tempV));
     }
 
     printHistorySeq(historySeq);
     cout << "---Base data from file-------------------" << endl;
-    printVector(record, filename);
+    printMap(record_map);
 
-    
-    ImportFile(record, historySeq, filename);
+    //ImportFile(record_map, historySeq);
     //outputTable(record);
-    //SortByName(record, historySeq, filename, sortedName_A, sortedName_D);
+    SortByName(record_map, historySeq, sortedName_A, sortedName_D);
     inFile.close();
     return 0;
 }
@@ -132,44 +128,39 @@ void printMainMenu(vector<Records> record)
 
 }
 
-void printVector(vector<Records> vector, string filename)
+void printMap(multimap<string, Records> record_map)
 {
-    cout << "---Vector.size(): " << vector.size() << endl;
+    int i = 0;
+    cout << "---record_map.size(): " << record_map.size() << endl;
     cout << "-----------------------------------------" << endl;
-    for (int i = 0; i < (int)vector.size(); i++) {
+    for (auto const& iter : record_map)
+    {
+        cout << setw(4) << right << i << ".  " 
+            << iter.second.date
+            << "  $" << iter.second.price << "  ";
 
-        cout << " ";
-        cout << i << ". " << vector[i].date << " $";
-        cout << vector[i].price << " ";
-
-        if (vector[i].name.size() > 60)
+        if (iter.second.name.size() > 40)
         {
-            //filename = 3070.csv
-            //filename_withoutformat = 3070
-            //(index_found + filename_withoutformat.size())
-            string filename_withoutformat = filename.substr(0, filename.size() - 4);
-            int index_found = vector[i].name.find(filename_withoutformat);
+            int index_found = iter.second.name.find(iter.first);
             int k = 0;
 
             //while (k != (index_found + filename_withoutformat.size() + 15))
-            while (k != (index_found + filename_withoutformat.size() + 15))
+            while (k != (index_found + iter.first.size() + 15))
             {
-                cout << vector[i].name[k];
+                cout << iter.second.name[k];
                 k++;
             }
-
-            cout << "..";
+            cout << ".." << endl;
         }
         else
         {
-           cout << vector[i].name;
+            cout << iter.second.name << endl;
         }
-        cout << endl;
+        i++;
     }
-    cout << "-----------------------------------------" << endl;
 }
 
-void SortByName(vector<Records>& record, vector<string>& historySeq, string filename, bool& sortedName_A, bool& sortedName_D)
+void SortByName(multimap<string, Records>& record_map, vector<string>& historySeq, bool& sortedName_A, bool& sortedName_D)
 {
     /*
     Prompts user to input sort preference (ascending/descending).
@@ -197,11 +188,11 @@ void SortByName(vector<Records>& record, vector<string>& historySeq, string file
         historySeq.push_back("SortName-A");
         printHistorySeq(historySeq);
 
-        sort(record.begin(), record.end(), [](Records a, Records b)
+        sort(record_map.begin(), record_map.end(), [](Records a, Records b)
             {return a.name < b.name; });
 
         cout << "---Sort By Name: Ascending Order" << endl;
-        printVector(record, filename);
+        printMap(record_map);
 
         cout << endl;
 
@@ -217,11 +208,11 @@ void SortByName(vector<Records>& record, vector<string>& historySeq, string file
         historySeq.push_back("SortName-D");
         printHistorySeq(historySeq);
 
-        sort(record.begin(), record.end(), [](Records a, Records b)
-            {return a.name > b.name; });
+        //sort(record_map.begin(), record_map.end(), [](Records a, Records b)
+        //    {return a.name > b.name; });
 
         cout << "---Sort By Name: Descending Order" << endl;
-        printVector(record, filename);
+        printMap(record_map);
 
         cout << endl;
 
@@ -233,19 +224,19 @@ void SortByName(vector<Records>& record, vector<string>& historySeq, string file
     else
     {
         cout << "Invalid input. " << endl;
-        SortByName(record, historySeq, filename, sortedName_A, sortedName_D);
+        SortByName(record_map, historySeq, sortedName_A, sortedName_D);
     }
 
 }
-
-void SortByPrice(vector<Records>& record, vector<string>& historySeq, string filename, string OrderPreference)
+/*
+void SortByPrice(multimap<string, Records>& record_map, vector<string>& historySeq, string OrderPreference)
 {
     /*
     Prompts user to input sort preference (ascending/descending).
     If input matches preference input string, sort based on preference
     If preference input is invalid:
     Repeat.
-    */
+    *//*
 
     string Repeat;
 
@@ -259,11 +250,11 @@ void SortByPrice(vector<Records>& record, vector<string>& historySeq, string fil
         historySeq.push_back("SortPrice-A");
         printHistorySeq(historySeq);
 
-        sort(record.begin(), record.end(), [](Records a, Records b)
+        sort(record_map.begin(), record_map.end(), [](Records a, Records b)
             {return a.price < b.price; });
 
         cout << "---Sort By Price: Ascending Order" << endl;
-        printVector(record, filename);
+        printMap(record_map);
 
         cout << endl;
         return;
@@ -277,11 +268,11 @@ void SortByPrice(vector<Records>& record, vector<string>& historySeq, string fil
         historySeq.push_back("SortPrice-D");
         printHistorySeq(historySeq);
 
-        sort(record.begin(), record.end(), [](Records a, Records b)
+        sort(record_map.begin(), record_map.end(), [](Records a, Records b)
             {return a.price > b.price; });
 
         cout << "---Sort By Price: Descending Order" << endl;
-        printVector(record, filename);
+        printMap(record_map);
 
         cout << endl;
         return;
@@ -290,12 +281,12 @@ void SortByPrice(vector<Records>& record, vector<string>& historySeq, string fil
     else
     {
         cout << "Invalid input. " << endl;
-        SortByPrice(record, historySeq, filename, OrderPreference);
+        SortByPrice(record_map, historySeq, OrderPreference);
     }
 
-}
-
-void SortByDate(vector<Records>& record, vector<string>& historySeq, string filename, string OrderPreference)
+}*/
+/*
+void SortByDate(multimap<string, Records>& record_map, vector<string>& historySeq, string OrderPreference)
 {
     /*
     Prompts user to input sort preference (ascending/descending).
@@ -303,7 +294,7 @@ void SortByDate(vector<Records>& record, vector<string>& historySeq, string file
     If preference input is invalid:
     Repeat.
     */
-
+/*
     string Repeat;
 
     cout << "Sort By (Ascending/Descending): ";
@@ -317,12 +308,12 @@ void SortByDate(vector<Records>& record, vector<string>& historySeq, string file
         historySeq.push_back("SortQty-A");
         printHistorySeq(historySeq);
 
-        sort(record.begin(), record.end(), [](Records a, Records b)
+        sort(record_map.begin(), record_map.end(), [](Records a, Records b)
             {return a.date < b.date; });
 
         cout << "---Sort By Quantity: Ascending Order" << endl;
 
-        printVector(record, filename);
+        printMap(record_map);
 
         cout << endl;
         cout << "---Time complexity : O(nlogn)" << endl;
@@ -336,12 +327,12 @@ void SortByDate(vector<Records>& record, vector<string>& historySeq, string file
         historySeq.push_back("SortQty-D");
         printHistorySeq(historySeq);
 
-        sort(record.begin(), record.end(), [](Records a, Records b)
+        sort(record_map.begin(), record_map.end(), [](Records a, Records b)
             {return a.date > b.date; });
 
 
         cout << "---Sort By Quantity: Descending Order" << endl;
-        printVector(record, filename);
+        printMap(record_map);
 
         cout << endl;
         cout << "---Time complexity : O(nlogn)" << endl;
@@ -351,10 +342,10 @@ void SortByDate(vector<Records>& record, vector<string>& historySeq, string file
     else
     {
         cout << "Invalid input. " << endl;
-        SortByDate(record, historySeq, filename, OrderPreference);
+        SortByDate(record_map, historySeq, OrderPreference);
     }
 
-}
+}*/
 
 void printHistorySeq(vector<string>& historySeq)
 {
@@ -432,8 +423,8 @@ bool isalphaCheck(string InputToCheck)
     }
     return false;
 }
-
-void InsertElement(vector<Records>& record, vector<string>& historySeq, string filename)
+/*
+void InsertElement(multimap<string, Records>& record_map, vector<string>& historySeq, string filename)
 {
     /*
     Prompts user to input values of a new element to be inserted into the vector [name:price:quantity].
@@ -445,9 +436,9 @@ void InsertElement(vector<Records>& record, vector<string>& historySeq, string f
     Yes, inserts element in the vector
     No, breaks out of the function.
     */
-
+    /*
     Records DummyElement;
-    
+
     string InsertDate;
     string InsertPrice;
     string InsertSource;
@@ -504,10 +495,10 @@ void InsertElement(vector<Records>& record, vector<string>& historySeq, string f
         DummyElement.price = InsertPrice_Float;
         DummyElement.source = InsertSource;
 
-        record.push_back(DummyElement);
+        record_map.insert(pair<string, Records>("manual_input", DummyElement));
 
         system("cls");
-        cout << record[record.size() - 1].name << endl;
+        //cout << record[record.size() - 1].name << endl;
 
         historySeq.push_back("InsertElement");
         printHistorySeq(historySeq);
@@ -518,14 +509,14 @@ void InsertElement(vector<Records>& record, vector<string>& historySeq, string f
             << DummyElement.price << ":"
             << DummyElement.source << "]" << endl;
 
-        printVector(record, filename);
+        printMap(record_map);
         return;
     }
 
     system("cls");
-    printVector(record, filename);
+    printMap(record_map);
     return;
-}
+}*/
 
 string FormatTime(system_clock::time_point tp) {
     
@@ -543,7 +534,7 @@ string CurrentTimeStr() {
     return FormatTime(system_clock::now());
 }
 
-void ImportFile(vector<Records>& record, vector<string>& historySeq, string filename)
+void ImportFile(multimap<string, Records>& record_map, vector<string>& historySeq)
 {
     /*
     Prompts user to input filename.txt of the file to merge with the base data table.
@@ -553,64 +544,66 @@ void ImportFile(vector<Records>& record, vector<string>& historySeq, string file
     Releases memory from tempVector.
     */
 
-    vector<Records> tempVector;
-    string filename1;
+    //vector<Records> tempVector;
+    multimap<string, Records> tempRecord_Map;
+    string mergefilename;
 
     cout << endl << "Import (filename.format): ";
-    cin >> filename1;
+    cin >> mergefilename;
+    string mergefilename_withoutformat = mergefilename.substr(0, mergefilename.size() - 4);
 
     //system("cls");
     historySeq.push_back("Import&Merge");
     printHistorySeq(historySeq);
 
     ifstream inFile;
-    inFile.open(filename1);
+    inFile.open(mergefilename);
 
     if (!inFile.is_open())
     {
         cerr << "---File cannot be opened. " << endl;
-        printVector(record, filename1);
+        printMap(record_map);
         return;
     }
 
+    //file -> map(string, struct)
+    Records tempV;
     string tempHeaderline;
-    while (getline(inFile, tempHeaderline))
-    {   
-        Records tempV;
+    inFile.ignore(500, '\n');
+    while (getline(inFile, tempV.date, ','))//!inFile.eof())
+    {
         string tempPrice;
 
-        getline(inFile, tempV.date, ',');
         getline(inFile, tempPrice, ',');
         tempV.price = stof(tempPrice);
         getline(inFile, tempV.source, ',');
         getline(inFile, tempV.name);
 
-        record.push_back(tempV);
+        tempRecord_Map.insert(pair<string, Records>(mergefilename_withoutformat, tempV));
     }
 
     cout << "---Base Data Table" << endl;
-    printVector(record, filename1);
+    printMap(record_map);
 
     cout << endl << "---Imported Data Table" << endl;
-    printVector(tempVector, filename);
+    printMap(tempRecord_Map);
 
-    MergeVectors(record, tempVector, filename);
+    MergeVectors(record_map, tempRecord_Map);
 
     inFile.close();
-    tempVector.clear();
-    tempVector.shrink_to_fit();
+    tempRecord_Map.clear();
+    //tempRecord_Map.shrink_to_fit();
 
     return;
 }
 
-void MergeVectors(vector<Records>& vector1, vector<Records> vector2, string filename)
+void MergeVectors(multimap<string, Records>& map1, multimap<string, Records> map2)
 {   
     //reserve memory for vector merge and insert vector2 at the back of vector1
-    vector1.reserve(vector1.size() + vector2.size());
-    vector1.insert(vector1.end(), vector2.begin(), vector2.end());
+    map2.insert(map1.begin(), map1.end());
 
     cout << endl << "---Merged Data Table" << endl;
-    printVector(vector1, filename);
+    printMap(map2);
 }
 
 void outputTable(vector<Records> vector)
@@ -673,4 +666,9 @@ void quicksort(vector<Records>& record, bool sortedName_A, bool sortedName_D, bo
     }
 
     return;
+}
+
+int cmpl(multimap<string, Records> A, multimap<string, Records> B)
+{
+    return A.second.price < B.second.price;
 }
