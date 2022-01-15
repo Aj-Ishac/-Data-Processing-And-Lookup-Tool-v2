@@ -15,7 +15,7 @@ using namespace std::chrono;
 struct Records {
 
     string date;
-    double price = 0;
+    float price = 0;
     string source;
     string name;
     string key;
@@ -29,13 +29,17 @@ void MenuController(vector<Records>&);
 void outputTable(vector<Records>);
 
 void SortByName(vector<Records>&, vector<string>&, bool&, bool&);
-void SortByPrice(vector<Records>&, vector<string>&, string);
+void SortByPrice(vector<Records>&, vector<string>&, string, bool&, bool&);
 void SortByDate(vector<Records>&, vector<string>&, string);
-void quicksort(vector<Records>&, bool, bool, bool&);
 
 void InsertElement(vector<Records>&, vector<string>&);
 void ModifyElement(vector<Records>&, vector<string>&);
 void RemoveElement(vector<Records>&, vector<string>&);
+
+void Search(vector<Records>, vector<string>&);
+int BinarySearch(vector<Records>, int, int, float);
+int linearSearch(vector<Records>, float);
+int linearSearch(vector<Records>, string);
 
 void ImportFile(vector<Records>&, vector<string>);
 void MergeVectors(vector<Records>&, vector<Records>, vector<string>&);
@@ -50,23 +54,28 @@ int main()
 {
     //print to csv
     //split receipt and output it seperately
-    //remove everything above x price after split receipt
+    //remove everything higher than x price after split receipt
     //look into changing historyseq from vector to array
     
     //binarysearch funcs currently disabled till solution presented. search, modify, remove disabled.
     //algo to run a check on incomplete string to complete string
     
+    //spacing issues with print. setw >> left >> right 
+    //cleanup input of length 1 only logic
+    //search currently implemented to search through price or name, change to index. holy shit ook ook, won't depend on shit like this
 
     //vector used for the base data
     vector<Records> record;
     vector<string> historySeq;
     Records tempV;
 
-    bool isSorted = false;
-    bool sortedName_A = false;
-    bool sortedName_D = false;
+    //bool isSorted = false;
+    //bool sortedName_A = false;
+    //bool sortedName_D = false;
+
+
     string Sort_Order;
-    string filename = "3070.csv";
+    string filename = "70.csv";
 
     //cout << endl << "Input Base File (filename.format): ";
     //cin >> filename;
@@ -83,7 +92,6 @@ int main()
     }
 
     //file -> struct input -> vector
-    string tempHeaderline;
     //inFile.ignore(500, '\n');
     while (getline(inFile, tempV.date, ','))//!inFile.eof())
     {
@@ -124,16 +132,20 @@ void MenuController(vector<Records>& record)
     */
 
     bool Repeat = true;
+
     bool isSorted = false;
     bool sortedName_A = false;
     bool sortedName_D = false;
+    bool sortedPrice_A = false;
+    bool sortedPrice_D = false;
+
     bool invalidChoice;
 
     char choice[6];
     string Sort_Order;
     vector<string> historySeq;
 
-    string input_diag;
+    string Preference;
     //bool bool_diag;
 
     do {
@@ -185,8 +197,8 @@ void MenuController(vector<Records>& record)
 
                     case '2':
                         //sortbyprice:
-                        SortByPrice(record, historySeq, Sort_Order);
-                        isSorted = false;
+                        SortByPrice(record, historySeq, Sort_Order, sortedPrice_A, sortedPrice_D);
+                        isSorted = true;
                         break;
 
                     case '3':
@@ -230,7 +242,7 @@ void MenuController(vector<Records>& record)
 
                     case '2':
                         //modifyelement:
-                        quicksort(record, sortedName_A, sortedName_D, isSorted);
+                        //quicksort(record, sortedName_A, sortedName_D, isSorted);
 
                         if (isSorted == 0)
                         {
@@ -247,7 +259,7 @@ void MenuController(vector<Records>& record)
 
                     case '3':
                         //removelement:
-                        quicksort(record, sortedName_A, sortedName_D, isSorted);
+                        //quicksort(record, sortedName_A, sortedName_D, isSorted);
 
                         if (isSorted == 0)
                         {
@@ -274,19 +286,80 @@ void MenuController(vector<Records>& record)
 
             case '4':
                 //search:
-                quicksort(record, sortedName_A, sortedName_D, isSorted);
+                cout << "Input preference to search by (Name/Price): ";
+                cin >> Preference;
 
-                if (isSorted == 0)
+                if (Preference == "Price" || Preference == "price" || Preference == "PRICE")
                 {
-                    system("cls");
-                    printHistorySeq(historySeq);
-                    cout << "---Function requires records to be sorted by name!" << endl;
-                    printVector(record);
+                    if (isSorted == 0)
+                    {
+                        int index;
+                        float ValueLookup;
 
+                        cout << "LSearch" << endl;
+                        cout << endl << "Search Product by Price: ";
+                        cin >> ValueLookup;
+
+                        index = linearSearch(record, ValueLookup);
+
+                        system("cls");
+                        printVector(record);
+                        printHistorySeq(historySeq);
+
+                        if (!(index == -1))
+                        {
+                            cout << "---Index " << index << " of Price: $"
+                                << record[index].price << ", registered on " << record[index].date << "." << endl;
+
+                            cout << "---" << record[index].name << endl;
+                            cout << "---" << record[index].source << endl;
+                            break;
+                        }
+
+                        cout << "---Failed to find input." << endl;
+                        break;
+
+                    }
+                    else
+                    {
+                        cout << "BSearch" << endl;
+                        Search(record, historySeq);
+                        break;
+                    }
+                }
+                else if(Preference == "Name" || Preference == "name" || Preference == "NAME")
+                {
+                    int index;
+                    string ValueLookup;
+
+                    cout << "LSearch" << endl;
+                    cout << endl << "Search Product by Name: ";
+                    getline(cin >> ws, ValueLookup);
+
+                    index = linearSearch(record, ValueLookup);
+
+                    system("cls");
+                    printVector(record);
+                    printHistorySeq(historySeq);
+
+                    if (!(index == -1))
+                    {
+                        cout << "---Index " << index << " of Price: $"
+                            << record[index].price << ", registered on " << record[index].date << "." << endl;
+
+                        cout << "---" << record[index].name << endl;
+                        cout << "---" << record[index].source << endl;
+                        break;
+                    }
+
+                    cout << "---Failed to find input." << endl;
                     break;
+                   
                 }
 
-                //Search(record, historySeq);
+                system("cls");
+                printVector(record);
+                printHistorySeq(historySeq);
                 break;
 
             case '5':
@@ -298,7 +371,7 @@ void MenuController(vector<Records>& record)
 
             case '6':
                 //duplicate check:
-                quicksort(record, sortedName_A, sortedName_D, isSorted);
+                //quicksort(record, sortedName_A, sortedName_D, isSorted);
 
                 if (isSorted == 0)
                 {
@@ -346,17 +419,17 @@ void MenuController(vector<Records>& record)
             {
                 //if input above length 1
                 system("cls");
+                printVector(record);
                 printHistorySeq(historySeq);
                 cout << "---Invalid input. Input of length 1 only." << endl;
-                printVector(record);
             }
             else
             {
                 //if characters exist
                 system("cls");
+                printVector(record);
                 printHistorySeq(historySeq);
                 cout << "---Invalid input. Digits valid only." << endl;
-                printVector(record);
             }
 
         }
@@ -386,7 +459,6 @@ void printMainMenu(vector<Records> record)
 
 void printVector(vector<Records> vector)
 {
-    char emptyspace = ' ';
     for (int i = 0; i < (int)vector.size(); i++) 
     {
         cout << " ";
@@ -476,7 +548,7 @@ void SortByName(vector<Records>& record, vector<string>& historySeq, bool& sorte
 
 }
 
-void SortByPrice(vector<Records>& record, vector<string>& historySeq, string OrderPreference)
+void SortByPrice(vector<Records>& record, vector<string>& historySeq, string OrderPreference, bool& sortedPrice_A, bool& sortedPrice_D)
 {
     /*
     Prompts user to input sort preference (ascending/descending).
@@ -503,6 +575,8 @@ void SortByPrice(vector<Records>& record, vector<string>& historySeq, string Ord
         cout << "---Sort By Price: Ascending Order" << endl;
 
         cout << endl;
+        sortedPrice_A = true;
+        sortedPrice_D = false;
         return;
 
 
@@ -520,13 +594,15 @@ void SortByPrice(vector<Records>& record, vector<string>& historySeq, string Ord
         cout << "---Sort By Price: Descending Order" << endl;
 
         cout << endl;
+        sortedPrice_A = false;
+        sortedPrice_D = true;
         return;
 
     }
     else
     {
         cout << "Invalid input. " << endl;
-        SortByPrice(record, historySeq, OrderPreference);
+        SortByPrice(record, historySeq, OrderPreference, sortedPrice_A, sortedPrice_D);
     }
 
 }
@@ -586,6 +662,83 @@ void SortByDate(vector<Records>& record, vector<string>& historySeq, string Orde
         SortByDate(record, historySeq, OrderPreference);
     }
 
+}
+
+void Search(vector<Records> record, vector<string>& historySeq)
+{
+    /*
+    Requires vector to be SortbyName at least once in the program's lifetime, else prompts user to do so.
+    Prompts user to input name to lookup through the vector.
+    If ValueLookup exists, prints index # and [name:price:quantity] of the search name.
+    */
+
+    float ValueLookup;
+    cout << endl << "Search Product by Price: ";
+    cin >> ValueLookup;
+
+    int index = BinarySearch(record, 0, record.size(), ValueLookup);
+
+    if (index > -1)
+    {
+
+        system("cls");
+
+        historySeq.push_back("Search");
+
+        printVector(record);
+        printHistorySeq(historySeq);
+
+        cout << "---Index " << index << " of Price: $"
+            << record[index].price << ", registered on " << record[index].date << "." << endl;
+        
+        cout << "---" << record[index].name << endl;
+        cout << "---" << record[index].source << endl;
+
+        return;
+
+    }
+
+    return;
+}
+
+int BinarySearch(vector<Records> record, int low, int high, float ValueLookup)
+{
+    if (record[0].price < record[record.size() - 1].price)
+    {
+        //if sorted in ascending order
+        if (low <= high)
+        {
+            int mid = (low + high) / 2;
+            if (ValueLookup == record[mid].price)
+                return mid;
+
+            if (ValueLookup < record[mid].price)
+                return BinarySearch(record, low, mid - 1, ValueLookup);
+            if (ValueLookup > record[mid].price)
+                return BinarySearch(record, mid + 1, high, ValueLookup);
+        }
+    }
+    if(record[0].price > record[record.size() - 1].price)
+    {
+        //if sorted in descending order
+        if (low <= high)
+        {
+            int mid = (low + high) / 2;
+            if (ValueLookup == record[mid].price)
+                return mid;
+
+            if (ValueLookup > record[mid].price)
+                return BinarySearch(record, low, mid - 1, ValueLookup);
+            if (ValueLookup < record[mid].price)
+                return BinarySearch(record, mid + 1, high, ValueLookup);
+        }
+    }
+
+    system("cls");
+    printVector(record);
+    cout << "---Failed to find input." << endl;
+
+    return -1;
 }
 
 void printHistorySeq(vector<string>& historySeq)
@@ -1012,3 +1165,56 @@ void quicksort(vector<Records>& record, bool sortedName_A, bool sortedName_D, bo
     return;
 }
 
+int linearSearch(vector<Records> record, float ValueLookup)
+{
+    int index;
+    cout << "linear search..." << endl;
+    for (int i = 0; i < (int)record.size(); i++)
+    {
+        if (record[i].price == ValueLookup)
+        {
+            index = i;
+            return index;
+        }       
+    }
+    return -1;
+}
+
+int linearSearch(vector<Records> record, string ValueLookup)
+{
+    int index;
+    cout << "linear search..." << endl;
+    for (int i = 0; i < (int)record.size(); i++)
+    {
+        if (record[i].name.find(ValueLookup) != string::npos)
+        {
+            index = i;
+            return index;
+        }
+    }
+    return -1;
+}
+
+void SearchIndex(vector<Records> record, string ValueLookup)
+{
+    bool Repeat;
+    int IndexInput;
+
+    do {
+        cout << "Input Index of Search: " << endl;
+        Repeat = false;
+        cin >> IndexInput;
+        //Repeat = isalphaCheck(IndexInput);
+
+        if (Repeat == true)
+            cout << "---Invalid Input." << endl;
+    } while (Repeat);
+
+    cout << "---Index " << IndexInput << " of Price: $"
+        << record[IndexInput].price << ", registered on " << record[IndexInput].date << "." << endl;
+
+    cout << "---" << record[IndexInput].name << endl;
+    cout << "---" << record[IndexInput].source << endl;
+
+
+}
