@@ -8,6 +8,7 @@
 #include <iomanip>
 #include <ctime>
 #include <sstream>
+#include <io.h>
 
 using namespace std;
 using namespace std::chrono;
@@ -26,7 +27,8 @@ void printVector(vector<Records>);
 void printHistorySeq(vector<string>&);
 void printMainMenu(vector<Records>);
 void MenuController(vector<Records>&);
-void outputTable(vector<Records>);
+void outputTable(vector<Records>, int);
+void splitReceipt(vector<Records>, int, int);
 
 void SortByName(vector<Records>&, vector<string>&, bool&, bool&);
 void SortByPrice(vector<Records>&, vector<string>&, string, bool&, bool&);
@@ -38,7 +40,7 @@ void ModifyElement(vector<Records>&, vector<string>&);
 void RemoveElement(vector<Records>&, vector<string>&);
 
 void SearchIndex(vector<Records>, vector<string>&);
-void ImportFile(vector<Records>&, vector<string>);
+void ImportFile(vector<Records>&, vector<string>, int&);
 void MergeVectors(vector<Records>&, vector<Records>, vector<string>&);
 void removeDuplicates(vector<Records>&, vector<string>&);
 
@@ -49,11 +51,17 @@ string FormatTime(system_clock::time_point);
 
 int main()
 {
-    //print to csv
-    //split receipt and output it seperately
+    //index needs to also be reset only in the csv for readability.
+
+    //followup exports to the same file need to go off ending index from csv
+    
     //remove everything higher than x price after split receipt
     
-    //spacing issues with print. setw >> left >> right 
+    //a lot of the isSorted bools aren't used anymore. cleanup cleanup
+
+    //date from insert and maybe others go with 01 for day, while python import provies 1 without leading zero.
+    //key from insertelement needs to be implemented to be in line with filename
+    //comments pass!!!
 
     //vector used for the base data
     vector<Records> record;
@@ -61,7 +69,7 @@ int main()
     Records tempV;
 
     string Sort_Order;
-    string filename = "70.csv";
+    string filename = "3070.csv";
 
     //cout << endl << "Input Base File (filename.format): ";
     //cin >> filename;
@@ -128,6 +136,11 @@ void MenuController(vector<Records>& record)
     bool invalidChoice;
 
     char choice[6];
+    int latest_index = 0;
+
+    int previous = 0;
+    int current = 1;
+
     string Sort_Order;
     vector<string> historySeq;
 
@@ -139,14 +152,23 @@ void MenuController(vector<Records>& record)
         printMainMenu(record);
         cin >> choice;
 
-
-
         //checks if choice[] input is alphabetical. forces a try again if so
         invalidChoice = isalphaCheck(choice);
         if (invalidChoice == false && strlen(choice) < 2)
         {
             switch (choice[0])
             {
+            case '0':
+                //split receipt
+                splitReceipt(record, previous, current);
+                
+                system("cls");
+                printVector(record);
+                historySeq.push_back("Split&Export");
+                printHistorySeq(historySeq);
+                cout << "---Successfully split records by ID and exported into seperate CSVs." << endl;
+                break;
+
             case '1':
                 //print table:
                 system("cls");
@@ -253,7 +275,8 @@ void MenuController(vector<Records>& record)
 
             case '5':
                 //import&merge file:
-                ImportFile(record, historySeq);
+                ImportFile(record, historySeq, latest_index);
+
                 isSorted = false;
                 break;
 
@@ -265,9 +288,13 @@ void MenuController(vector<Records>& record)
 
             case '7':
                 //store records on file
-                outputTable(record);
+                outputTable(record, latest_index);
+                system("cls");
                 historySeq.push_back("StoreRecords");
                 printVector(record);
+                printHistorySeq(historySeq);
+
+                cout << "---Exported table." << endl;
                 break;
 
             case '8':
@@ -292,22 +319,22 @@ void MenuController(vector<Records>& record)
         }
         else
         {
-            if (strlen(choice) > 2)
-            {
-                //if input above length 1
-                system("cls");
-                printVector(record);
-                printHistorySeq(historySeq);
-                cout << "---Invalid input. Input of length 1 only." << endl;
-            }
-            else
-            {
-                //if characters exist
-                system("cls");
-                printVector(record);
-                printHistorySeq(historySeq);
-                cout << "---Invalid input. Digits valid only." << endl;
-            }
+        if (strlen(choice) > 2)
+        {
+            //if input above length 1
+            system("cls");
+            printVector(record);
+            printHistorySeq(historySeq);
+            cout << "---Invalid input. Input of length 1 only." << endl;
+        }
+        else
+        {
+            //if characters exist
+            system("cls");
+            printVector(record);
+            printHistorySeq(historySeq);
+            cout << "---Invalid input. Digits valid only." << endl;
+        }
 
         }
     } while (Repeat);
@@ -336,14 +363,14 @@ void printMainMenu(vector<Records> record)
 
 void printVector(vector<Records> vector)
 {
-    for (int i = 0; i < (int)vector.size(); i++) 
+    for (int i = 0; i < (int)vector.size(); i++)
     {
         cout << " ";
-        cout << setw(3) << i << ". " << vector[i].date << " $";
-        cout << vector[i].price << " ";
+        cout << setw(3) << right << i << ". " << vector[i].date;
+        cout << " $" << setw(4) << left << vector[i].price << " ";
 
         if (vector[i].name.size() > 60)
-        {   
+        {
             int indexOfKey = vector[i].name.find(vector[i].key);
             int final_index = vector[i].name.find(" ", indexOfKey + vector[i].key.size() + 15);
 
@@ -355,9 +382,24 @@ void printVector(vector<Records> vector)
         }
         cout << endl;
     }
-    cout << endl << "---Vector.size(): " << vector.size() - 1<< endl;
-    //cout << "-----------------------------------------" << endl;
-    //cout << "-----------------------------------------" << endl;
+    cout << endl << "---Vector.size(): " << vector.size() - 1 << endl;
+
+}
+
+void outputTable(vector < Records> vector, int latest_index)
+{
+    ofstream outputFile;
+    string filename = "outputTable-base.csv";
+    outputFile.open(filename, ios::app);
+
+    for (int i = 0; i < (int)vector.size(); i++)
+    {
+        outputFile << i << ",";
+        outputFile << vector[i].date << ",";
+        outputFile << " $" << vector[i].price << ",";
+        outputFile << vector[i].source << ",";
+        outputFile << vector[i].name << "," << endl;
+    }
 }
 
 void SortByName(vector<Records>& record, vector<string>& historySeq, bool& sortedName_A, bool& sortedName_D)
@@ -572,6 +614,52 @@ void printHistorySeq(vector<string>& historySeq)
     //cout << endl;
 }
 
+void splitReceipt(vector<Records> record, int previous, int current)
+{
+    int csv_index = 0;
+    string filename = "outputTable-" + record[previous].key + ".csv";
+
+    ofstream outputFile;
+    outputFile.open(filename, ios::app);
+
+    if (record.size() == 0)
+    {
+        cout << "Inventory is empty." << endl;
+        return;
+    }
+
+    //outputFile << previous << ",";
+    outputFile << csv_index << ",";
+    outputFile << record[previous].date << ",";
+    outputFile << " $" << record[previous].price << ",";
+    outputFile << record[previous].source << ",";
+    outputFile << record[previous].name << "," << endl;
+
+    for (current; current < (int)record.size(); current++)
+    {
+        if (record[current].key != record[previous].key)
+        {   
+            previous++;
+            current++;
+
+            outputFile.close();
+            splitReceipt(record, previous, current);
+        }
+
+        csv_index++;
+        if (record[current].key == record[previous].key)
+        {
+            //outputFile << current << ",";
+            outputFile << csv_index << ",";
+            outputFile << record[current].date << ",";
+            outputFile << " $" << record[current].price << ",";
+            outputFile << record[current].source << ",";
+            outputFile << record[current].name << "," << endl;
+        }
+        previous++;
+    }
+}
+
 bool isdigitCheck(string InputToCheck)
 {
     /*
@@ -632,7 +720,6 @@ void InsertElement(vector<Records>& record, vector<string>& historySeq)
 
     Records DummyElement;
 
-    string InsertDate;
     string InsertPrice;
     string InsertSource;
     string InsertName;
@@ -645,9 +732,7 @@ void InsertElement(vector<Records>& record, vector<string>& historySeq)
     cout << endl << "Inserting Element into database.." << endl;
     cout << "Input [date:name:price:source]" << endl << endl;
     //assigning date of InsertElement action
-
-    InsertDate = CurrentTimeStr();
-    cout << "Input Date: " << InsertDate << endl;
+    cout << "Input Date: " << CurrentTimeStr() << endl;
     
     //input name of product
     cout << "Input Name: ";
@@ -673,18 +758,18 @@ void InsertElement(vector<Records>& record, vector<string>& historySeq)
     cin >> InsertSource;
 
     cout << endl;
-    cout << "Confirm ["
-        << InsertDate << ":"
-        << InsertName << ":"
-        << InsertPrice_Float << ":"
-        << InsertSource << "]? (Y/N): ";
+    cout << "---Index " << record.size() + 1 << " of Price: $"
+        << InsertPrice_Float << ", registered on Date: " << CurrentTimeStr() << "." << endl;
+    cout << "---Name: " << InsertName << endl;
+    cout << "---Source: " << InsertSource << endl;
+    cout << "---Confirm Element Remove (Y/N): ";
 
     cin >> Confirmation_One;
 
     if (Confirmation_One == "Y" || Confirmation_One == "y"
         || Confirmation_One == "Yes" || Confirmation_One == "yes")
     {
-        DummyElement.date = InsertDate;
+        DummyElement.date = CurrentTimeStr();
         DummyElement.name = InsertName;
         DummyElement.price = InsertPrice_Float;
         DummyElement.source = InsertSource;
@@ -692,18 +777,17 @@ void InsertElement(vector<Records>& record, vector<string>& historySeq)
         record.push_back(DummyElement);
 
         system("cls");
-        cout << record[record.size() - 1].name << endl;
 
         printVector(record);
         historySeq.push_back("InsertElement");
         printHistorySeq(historySeq);
 
-        cout << "---Inserted ["
-            << DummyElement.date << ":"
-            << DummyElement.name << ":"
-            << DummyElement.price << ":"
-            << DummyElement.source << "]" << endl;
-
+        cout << endl;
+        cout << "---Index " << record.size() + 1 << " of Price: $"
+            << DummyElement.price << ", registered on Date: " << DummyElement.date << "." << endl;
+        cout << "---Name: " << DummyElement.name << endl;
+        cout << "---Source: " << DummyElement.source << endl;
+        cout << "---Inserted Element successfully.";
         return;
     }
 
@@ -877,7 +961,7 @@ void RemoveElement(vector<Records>& record, vector<string>& historySeq)
     string ValueLookup;
     int IntValueLookup;
     bool Repeat;
-    int index;
+    //int index;
 
     do {
         cout << "Input Index of Search: ";
@@ -935,16 +1019,15 @@ string FormatTime(system_clock::time_point tp) {
     auto tp2 = system_clock::from_time_t(t);
     if (tp2 > tp)
         t = system_clock::to_time_t(tp - seconds(1));
-    ss << put_time(localtime(&t), "%m/%d/22")
-        << setfill('0') << setw(2);
-    return ss.str();
+    ss << put_time(localtime(&t), "%m/%d/%Y");
+    return ss.str(); 
 }
 
 string CurrentTimeStr() {
     return FormatTime(system_clock::now());
 }
 
-void ImportFile(vector<Records>& record, vector<string> historySeq)
+void ImportFile(vector<Records>& record, vector<string> historySeq, int& latest_index)
 {
     /*
     Prompts user to input filename.txt of the file to merge with the base data table.
@@ -972,13 +1055,10 @@ void ImportFile(vector<Records>& record, vector<string> historySeq)
         return;
     }
 
-    cout << "---Base Data Table" << endl;
-
-    printVector(record);
+    //cout << "---Base Data Table" << endl;
+    //printVector(record);
 
     Records tempStruct;
-    string tempHeaderline;
-    //inFile.ignore(500, '\n');
     while (getline(inFile, tempStruct.date, ','))
     {
         string tempPrice;
@@ -993,16 +1073,28 @@ void ImportFile(vector<Records>& record, vector<string> historySeq)
         tempVector.push_back(tempStruct);
     }
 
-    cout << endl << "---Imported Data Table" << endl;
-    printVector(tempVector);
+    //cout << endl << "---Imported Data Table" << endl;
+    //printVector(tempVector);
 
     MergeVectors(record, tempVector, historySeq);
-
     inFile.close();
     tempVector.clear();
     tempVector.shrink_to_fit();
 
     return;
+}
+
+void MergeVectors(vector<Records>& vector1, vector<Records> vector2, vector<string>& historySeq)
+{
+    //reserve memory for vector merge and insert vector2 at the back of vector1
+    vector1.reserve(vector1.size() + vector2.size());
+    vector1.insert(vector1.end(), vector2.begin(), vector2.end());
+
+    cout << endl << "---Merged Data Table" << endl;
+    printVector(vector1);
+    historySeq.push_back("Import&Merge");
+    printHistorySeq(historySeq);
+    cout << "---File has been imported and merged." << endl;
 }
 
 void removeDuplicates(vector<Records>& record, vector<string>& historySeq)
@@ -1102,50 +1194,6 @@ void removeDuplicates(vector<Records>& record, vector<string>& historySeq)
     return;
 }
 
-void MergeVectors(vector<Records>& vector1, vector<Records> vector2, vector<string>& historySeq)
-{
-    //reserve memory for vector merge and insert vector2 at the back of vector1
-    vector1.reserve(vector1.size() + vector2.size());
-    vector1.insert(vector1.end(), vector2.begin(), vector2.end());
-
-    cout << endl << "---Merged Data Table" << endl;
-    printVector(vector1);
-    historySeq.push_back("Import&Merge");
-    printHistorySeq(historySeq);
-    cout << "---File has been imported and merged." << endl;
-}
-
-void outputTable(vector<Records> vector)
-{
-    //output current iteration of the base data table into a filename.txt of the user's choice. 
-
-    string filename;
-    cout << endl << "Input file name to store records (filename.csv): ";
-    cin >> filename;
-
-    system("cls");
-    ofstream outputFile;
-    outputFile.open(filename);
-    outputFile << "[" << filename << "]" << endl;
-
-    outputFile << "---Vector.size(): " << vector.size() << endl;
-    outputFile << "---vector.capacity(): " << vector.capacity() << endl;
-    outputFile << "-----------------------------------------" << endl;
-    outputFile << endl << "  -Name-       -Price-    -Qty-" << endl;
-    for (int i = 0; i < (int)vector.size(); i++)
-    {
-        outputFile << vector[i].date << ",";
-        outputFile << vector[i].price << ",";
-        outputFile << vector[i].source << ",";
-        outputFile << vector[i].name << ",";
-        outputFile << endl;
-    }
-
-    cout << "---Records have been stored under " << filename << ". " << endl;
-
-    outputFile.close();
-}
-
 void SearchIndex(vector<Records> record, vector<string>& historySeq)
 {
     bool Repeat;
@@ -1197,3 +1245,4 @@ void forceSortName(vector<Records>& record)
 
     return;
 }
+
