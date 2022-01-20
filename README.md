@@ -10,6 +10,6 @@ Program functionality:
 3. Load Element Details
 4. Import and Merge File
 5. Check for Duplicates
-6. v2 Update - Remove Elements Within KeyRange Above Price
+6. v2 Update - Remove Elements Within KeyRange Above Input Price
 7. v2 Update - Store Records on File, Separated by Key
 8. Store All Records on File
